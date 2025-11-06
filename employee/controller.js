@@ -182,13 +182,11 @@ module.exports = {
   getEmployment: async (req, res) => {
     try {
       const { role } = req.admin;
-      const company_id = req.query.company;
+      // const company_id = req.query.company;
       // role === "Super Admin " || role === "Group Admin"
       // ? req.query.company
       // : req.admin.company_id;
-      const employment = await Employment.find({
-        company_id,
-      })
+      const employment = await Employment.find()
         .select(
           "company_id emp_fullname emp_desid emp_depid emp_status emp_profile"
         )
