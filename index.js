@@ -65,7 +65,6 @@ const StatisticRoutes = require("./statistic/routes");
 // }
 // NotificationModel();
 const router = express.Router();
-require("./corn");
 
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -77,17 +76,6 @@ app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Credentials", true);
   next();
 });
-
-// app.use(
-//   cors({
-//     origin: "*", // Atur asal sesuai dengan domain Anda
-//     methods: "GET,PUT,POST,DELETE",
-//     allowedHeaders: "Content-Type, Authorization",
-//     credentials: true,
-//   })
-// );
-
-// app.use(cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

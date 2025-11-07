@@ -1,0 +1,3 @@
+* 0/5 * ? * * * node supercronic/lima_menit.js > log.txt
+* * 16 ? * * * node supercronic/tengah_malam.js > log.txt
+* * 19 ? * * * node supercronic/tiga_pagi.js > log.txt

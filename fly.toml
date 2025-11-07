@@ -23,6 +23,10 @@ primary_region = 'sin'
   min_machines_running = 1
   processes = ['app']
 
+[processes]
+  app = "yarn start"
+  cron = "supercronic /app/crontab"
+
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
