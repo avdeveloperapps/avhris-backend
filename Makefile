@@ -1,2 +1,2 @@
 proxy:
-	fly proxy  27017 -a avhris-database
+	flyctl proxy 27017:27017 -a avhris-database

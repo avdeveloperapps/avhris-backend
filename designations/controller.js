@@ -6,7 +6,7 @@ module.exports = {
     try {
       const { des_name, des_desc, emp_id } = req.body;
       const company_id = req.query.company;
-      // console.log(emp_id);
+      const { role } = req.admin;
       if (
         role === "Super Admin" ||
         role === "App Admin" ||
@@ -30,7 +30,7 @@ module.exports = {
       }
     } catch (error) {
       console.log(error);
-      res.status(500).json({ message: "Failed to Add new Designation" });
+      res.status(500).json({ message: error });
     }
   },
   GetRelDes: async (req, res) => {
