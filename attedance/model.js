@@ -91,4 +91,17 @@ const AttedanceSchema = mongoose.Schema({
   },
 });
 
+AttedanceSchema.index({ company_id: 1, attendance_date: 1 });
+AttedanceSchema.index({ company_id: 1, emp_id: 1, attendance_date: 1 });
+AttedanceSchema.index({
+  company_id: 1,
+  behavior_at: 1,
+  attendance_date: 1,
+});
+AttedanceSchema.index({
+  company_id: 1,
+  attendance_status: 1,
+  attendance_date: 1,
+});
+
 module.exports = mongoose.model("emp_attendance", AttedanceSchema);

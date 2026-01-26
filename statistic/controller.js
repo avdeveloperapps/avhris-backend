@@ -16,13 +16,19 @@ module.exports = {
         leave_today,
       } = req.query;
 
-      const periods = await Periodic.find({
+      const activePeriod = await Periodic.findOne({
         company_id,
         periodic_status: true,
-      });
+      }).lean();
 
-      const startDate = moment(periods[0].periodic_start_date);
-      const endDate = moment(periods[0].periodic_end_date);
+      if (!activePeriod) {
+        return res.status(404).send({
+          message: "Active periodic data not found for this company",
+        });
+      }
+
+      const startDate = moment(activePeriod.periodic_start_date);
+      const endDate = moment(activePeriod.periodic_end_date);
       const diff = endDate.diff(startDate, "days") + 1;
       const ranges = [];
       for (let i = 0; i < diff; i++) {
@@ -32,123 +38,111 @@ module.exports = {
         moment(range).format("MM/DD/YYYY")
       );
 
-      const pageNumber = parseInt(req.query.page) || 0;
-      const limit = parseInt(req.query.limit) || 5;
-      let startIndex = (pageNumber - 1) * limit;
-      const endIndex = (pageNumber + 1) * limit;
-      let meta = {};
+      const pageNumber = Math.max(parseInt(req.query.page, 10) || 1, 1);
+      const limit = Math.max(parseInt(req.query.limit, 10) || 5, 1);
+      const startIndex = (pageNumber - 1) * limit;
+      let meta = {
+        total: 0,
+        totalPages: 0,
+        currentPage: pageNumber,
+      };
       let employeeStatistics = [];
-      if (by_late) {
-        const count = await Attendance.find({
-          company_id,
-          behavior_at: "Late",
-          attendance_date: { $in: formateRanges },
-        }).countDocuments();
+      const attendanceDateFilter = { attendance_date: { $in: formateRanges } };
 
-        const find = {
-          company_id,
-          behavior_at: "Late",
-          attendance_date: { $in: formateRanges },
-        };
-
-        const employeeAttendances = await Attendance.find(find).populate({
-          path: "emp_id",
-          select: "emp_fullname _id emp_depid",
-          populate: {
-            path: "emp_depid",
-            select: "dep_name",
+      const attendanceAggregationLookups = [
+        {
+          $lookup: {
+            from: "employmeents",
+            localField: "_id",
+            foreignField: "_id",
+            as: "employee",
           },
-        });
+        },
+        { $unwind: "$employee" },
+        {
+          $lookup: {
+            from: "departements",
+            localField: "employee.emp_depid",
+            foreignField: "_id",
+            as: "department",
+          },
+        },
+        {
+          $unwind: {
+            path: "$department",
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $project: {
+            total: 1,
+            employee: {
+              _id: "$employee._id",
+              emp_fullname: "$employee.emp_fullname",
+              emp_depid: "$department",
+            },
+          },
+        },
+      ];
 
-        employeeStatistics = await Promise.all(
-          employeeAttendances.map(async (employee) => {
-            const attendances = await Attendance.find({
-              ...find,
-              emp_id: employee.emp_id._id,
-              attendance_date: { $in: formateRanges },
-            }).countDocuments();
+      const buildAttendanceAggregation = (match) => [
+        { $match: match },
+        { $group: { _id: "$emp_id", total: { $sum: 1 } } },
+        {
+          $facet: {
+            metadata: [{ $count: "total" }],
+            data: [
+              { $sort: { total: -1 } },
+              { $skip: startIndex },
+              { $limit: limit },
+              ...attendanceAggregationLookups,
+            ],
+          },
+        },
+        {
+          $project: {
+            data: "$data",
+            meta: {
+              total: {
+                $ifNull: [{ $arrayElemAt: ["$metadata.total", 0] }, 0],
+              },
+            },
+          },
+        },
+      ];
 
-            return {
-              employee: employee.emp_id,
-              total: attendances,
-            };
+      if (by_late) {
+        const [result] = await Attendance.aggregate(
+          buildAttendanceAggregation({
+            company_id,
+            behavior_at: "Late",
+            ...attendanceDateFilter,
           })
         );
 
-        employeeStatistics = employeeStatistics.filter(
-          (value, index, self) =>
-            index ===
-            self.findIndex(
-              (t) =>
-                t.employee._id === value.employee._id &&
-                t.employee.emp_fullname === value.employee.emp_fullname
-            )
-        );
+        const totalData = result?.meta?.total || 0;
+        employeeStatistics = result?.data || [];
         meta = {
-          total: count,
-          totalPages: Math.ceil((count / limit) * 1),
+          total: totalData,
+          totalPages: Math.ceil((totalData / limit) * 1),
           currentPage: pageNumber,
         };
       }
 
       if (by_absent) {
-        const findAttendance = {
-          company_id,
-          attendance_status: "Absent",
-        };
-        const count = await Attendance.find({
-          ...findAttendance,
-          attendance_date: { $in: formateRanges },
-        }).countDocuments();
-
-        const employeeAttendances = await Attendance.find(
-          findAttendance
-        ).populate({
-          path: "emp_id",
-          select: "emp_fullname _id emp_depid",
-          populate: {
-            path: "emp_depid",
-            select: "dep_name",
-          },
-        });
-
-        employeeStatistics = await Promise.all(
-          employeeAttendances.map(async (employee) => {
-            if (employee.emp_id) {
-              const attendances = await Attendance.find({
-                ...findAttendance,
-                emp_id: employee.emp_id._id,
-                attendance_date: { $in: formateRanges },
-              }).countDocuments();
-              return {
-                employee: employee.emp_id,
-                total: attendances,
-              };
-            } else {
-              return {
-                employee: null,
-                total: null,
-              };
-            }
+        const [result] = await Attendance.aggregate(
+          buildAttendanceAggregation({
+            company_id,
+            attendance_status: "Absent",
+            ...attendanceDateFilter,
           })
         );
 
-        const filterEmployee = employeeStatistics.filter(
-          (statistic) => statistic.employee !== null
-        );
-        employeeStatistics = filterEmployee.filter(
-          (value, index, self) =>
-            index ===
-            self.findIndex(
-              (t) =>
-                t.employee._id === value.employee._id &&
-                t.employee.emp_fullname === value.employee.emp_fullname
-            )
-        );
-
+        const totalData = result?.meta?.total || 0;
+        employeeStatistics = result?.data || [];
         meta = {
-          tota: count,
-          totalPages: Math.ceil((count / limit) * 1),
+          total: totalData,
+          totalPages: Math.ceil((totalData / limit) * 1),
           currentPage: pageNumber,
         };
       }
@@ -158,24 +152,23 @@ module.exports = {
           .locale("ID")
           .format("dddd")
           .toLowerCase();
-        const count = await Employee.find({
-          company_id,
-        }).countDocuments();
+        const offDayField = `emp_attadance.${today}.off_day`;
+        const offDayQuery = { company_id, [offDayField]: true };
+        const [count, employees] = await Promise.all([
+          Employee.countDocuments(offDayQuery),
+          Employee.find(offDayQuery)
+            .sort("_id")
+            .skip(startIndex)
+            .limit(limit)
+            .lean(),
+        ]);
 
-        const employees = await Employee.find({
-          company_id,
-        }).sort("_id");
-
-        const filterEmployee = employees.filter((employee) => {
-          return employee.emp_attadance[today].off_day === true;
-        });
-
-        employeeStatistics = filterEmployee.map((employeeStatistic) => {
+        employeeStatistics = employees.map((employeeStatistic) => {
           return { employee: employeeStatistic, total: 1 };
         });
 
         meta = {
-          total: employeeStatistics.length,
+          total: count,
           totalPages: Math.ceil((count / limit) * 1),
           currentPage: pageNumber,
         };
@@ -183,24 +176,28 @@ module.exports = {
 
       if (leave_request) {
         const today = moment(Date.now()).format("YYYY-MM-DD");
-        const count = await LeaveRequest.find({
-          company_id,
-          empleave_start_date: today,
-        }).countDocuments();
-
-        const attendances = await LeaveRequest.find({
-          company_id,
-          empleave_start_date: today,
-        }).populate({
-          path: "emp_id",
-          select: "emp_fullname _id emp_depid",
-          populate: {
-            path: "emp_depid",
-            select: "dep_name",
-          },
-        });
+        const [count, attendances] = await Promise.all([
+          LeaveRequest.find({
+            company_id,
+            empleave_start_date: today,
+          }).countDocuments(),
+          LeaveRequest.find({
+            company_id,
+            empleave_start_date: today,
+          })
+            .skip(startIndex)
+            .limit(limit)
+            .populate({
+              path: "emp_id",
+              select: "emp_fullname _id emp_depid",
+              populate: {
+                path: "emp_depid",
+                select: "dep_name",
+              },
+            }),
+        ]);
         meta = {
-          tota: count,
+          total: count,
           totalPages: Math.ceil((count / limit) * 1),
           currentPage: pageNumber,
         };
@@ -212,28 +209,28 @@ module.exports = {
 
       if (leave_today) {
         const today = moment(Date.now()).format("YYYY-MM-DD");
-        const count = await LeaveRequest.find({
+        const leaveFilter = {
           company_id,
           empleave_start_date: today,
           empleave_hr: {
             status: "Approved",
           },
-        }).countDocuments();
+        };
 
-        const attendances = await LeaveRequest.find({
-          company_id,
-          empleave_start_date: today,
-          empleave_hr: {
-            status: "Approved",
-          },
-        }).populate({
-          path: "emp_id",
-          select: "emp_fullname _id emp_depid",
-          populate: {
-            path: "emp_depid",
-            select: "dep_name",
-          },
-        });
+        const [count, attendances] = await Promise.all([
+          LeaveRequest.find(leaveFilter).countDocuments(),
+          LeaveRequest.find(leaveFilter)
+            .skip(startIndex)
+            .limit(limit)
+            .populate({
+              path: "emp_id",
+              select: "emp_fullname _id emp_depid",
+              populate: {
+                path: "emp_depid",
+                select: "dep_name",
+              },
+            }),
+        ]);
 
         meta = {
           total: count,
@@ -246,11 +243,9 @@ module.exports = {
         });
       }
 
-      const filterEmployees = employeeStatistics.filter(
-        (employee) => employee.total !== 0
-      );
-
-      const sortEmployee = filterEmployees.sort((a, b) => b.total - a.total);
+      const sortEmployee = employeeStatistics
+        .filter((employee) => employee.total !== 0)
+        .sort((a, b) => b.total - a.total);
 
       return res.status(200).send({ data: sortEmployee, meta });
     } catch (error) {
