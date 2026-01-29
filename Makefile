@@ -1,5 +1,2 @@
-deploy:
-	fly deploy --no-cache
-
 proxy:
-	fly proxy  27017 -a avhris-db
+	flyctl proxy 27017:27017 -a avhris-database

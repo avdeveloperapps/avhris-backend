@@ -3,7 +3,9 @@ const app = express();
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 require("dotenv").config();
+const CONFIG = require("./config");
 require("./database");
+const mongoose = require("mongoose");
 const companyRoute = require("./company/routes");
 const adminRoute = require("./admin/routes");
 const departementRoute = require("./departement/routes");
@@ -66,6 +68,7 @@ const StatisticRoutes = require("./statistic/routes");
 // }
 // NotificationModel();
 const router = express.Router();
+require("./corn");
 
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -145,6 +148,23 @@ app.use(`/${api_version}/output-file`, OutputFileRoutes);
 app.use(`/${api_version}/users-and-roles`, UsersAndRolesRoutes);
 app.use(`/${api_version}/statistic`, StatisticRoutes);
 
-app.listen(process.env.PORT, async () => {
-  console.log(`Server start running on port ${process.env.PORT}`);
+// Ensure indexes are in sync on startup (covers existing data as well).
+const syncIndexesOnStart = async () => {
+  try {
+    await mongoose.connection.asPromise();
+    const models = mongoose.models || {};
+    await Promise.all(
+      Object.values(models).map((model) => model.syncIndexes())
+    );
+    console.log(
+      `Indexes synced for ${Object.keys(models).length} models on startup`
+    );
+  } catch (err) {
+    console.error("Index sync failed:", err.message);
+  }
+};
+syncIndexesOnStart();
+
+app.listen(CONFIG.port, async () => {
+  console.log(`Server start running on port ${CONFIG.port}`);
 });

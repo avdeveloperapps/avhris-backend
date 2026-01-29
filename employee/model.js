@@ -223,4 +223,12 @@ const EmployementSchema = new Schema({
   },
 });
 
+EmployementSchema.index({ company_id: 1, "emp_attadance.senin.off_day": 1 });
+EmployementSchema.index({ company_id: 1, "emp_attadance.selasa.off_day": 1 });
+EmployementSchema.index({ company_id: 1, "emp_attadance.rabu.off_day": 1 });
+EmployementSchema.index({ company_id: 1, "emp_attadance.kamis.off_day": 1 });
+EmployementSchema.index({ company_id: 1, "emp_attadance.jumat.off_day": 1 });
+EmployementSchema.index({ company_id: 1, "emp_attadance.sabtu.off_day": 1 });
+EmployementSchema.index({ company_id: 1, "emp_attadance.minggu.off_day": 1 });
+
 module.exports = mongoose.model("Employmeent", EmployementSchema);

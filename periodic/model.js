@@ -27,4 +27,6 @@ const PeriodicSchema = mongoose.Schema({
   },
 });
 
+PeriodicSchema.index({ company_id: 1, periodic_status: 1 });
+
 module.exports = mongoose.model("periodic", PeriodicSchema);

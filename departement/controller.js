@@ -88,6 +88,18 @@ module.exports = {
       res.status(500).json({ message: "Failed to Get Departement" });
     }
   },
+  getDepartementNew: async (req, res) => {
+    try {
+      const company_id = req.query.company;
+      const departemen = await Departement.find()
+        .populate({ path: "company_id", select: "company_name" })
+        .populate({ path: "dep_manager", select: "emp_fullname" });
+      res.status(200).json(departemen);
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ message: "Failed to Get Departement" });
+    }
+  },
   detailDepartement: async (req, res) => {
     try {
       const { id } = req?.params;

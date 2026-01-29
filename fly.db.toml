@@ -1,0 +1,45 @@
+# fly.toml for MongoDB on Fly.io
+# Deploy with: fly deploy -c fly.db.toml
+
+app = "avhris-database"
+primary_region = "sin"
+
+[build]
+image = "mongo:latest"
+
+[experimental]
+auto_rollback = true
+# Listen on all interfaces so internal clients can connect
+cmd = ["mongod", "--ipv6", "--bind_ip_all"]
+  [experimental.attached]
+  secrets = {}
+
+[[mounts]]
+# Use the existing 2GB volume (db_storage2 => vol_vx2d39k9n37gngjr) to avoid creating new storage.
+source = "vol_vx2d39k9n37gngjr"
+destination = "/data/db"
+
+[[services]]
+protocol = "tcp"
+internal_port = 27017
+processes = ["app"]
+auto_start_machines = true
+auto_stop_machines = true
+min_machines_running = 1
+  [[services.ports]]
+  port = 27017
+
+  [services.concurrency]
+  type = "connections"
+  soft_limit = 20
+  hard_limit = 25
+
+  [[services.tcp_checks]]
+  interval = "15s"
+  timeout = "2s"
+  grace_period = "1s"
+
+[[vm]]
+cpu_kind = "shared"
+cpus = 1
+memory = "1gb"

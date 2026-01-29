@@ -104,4 +104,11 @@ const LeaveRequestSchema = new Schema({
   },
 });
 
+LeaveRequestSchema.index({ company_id: 1, empleave_start_date: 1 });
+LeaveRequestSchema.index({
+  company_id: 1,
+  empleave_start_date: 1,
+  "empleave_hr.status": 1,
+});
+
 module.exports = mongoose.model("emp_leave", LeaveRequestSchema);

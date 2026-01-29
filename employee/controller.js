@@ -16,7 +16,7 @@ const Allowance = require("../emp-allowance/model");
 const Deduction = require("../emp-deduction/model");
 const Education = require("../education/model");
 const Bank = require("../bank/model");
-const { calculateAttendanceAbsent } = require("../supercronic/index");
+const { calculateAttendanceAbsent } = require("../corn/index");
 const { dateToday, getDayName } = require("../attedance/controller");
 
 module.exports = {
@@ -182,13 +182,11 @@ module.exports = {
   getEmployment: async (req, res) => {
     try {
       const { role } = req.admin;
-      const company_id = req.query.company;
+      // const company_id = req.query.company;
       // role === "Super Admin " || role === "Group Admin"
       // ? req.query.company
       // : req.admin.company_id;
-      const employment = await Employment.find({
-        company_id,
-      })
+      const employment = await Employment.find()
         .select(
           "company_id emp_fullname emp_desid emp_depid emp_status emp_profile"
         )
