@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 require("./database");
 const companyRoute = require("./company/routes");
@@ -77,6 +78,23 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many requests, please try again later." },
+  })
+);
+app.use((req, res, next) => {
+  res.setTimeout(5000, () => {
+    if (!res.headersSent) {
+      res.status(503).json({ message: "Request timeout" });
+    }
+  });
+  next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use("/images", express.static(path.join(__dirname, "public/uploads")));
