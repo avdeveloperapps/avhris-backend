@@ -110,10 +110,69 @@ app.use(
     },
   })
 );
+// NOTE: Avoid sending a timeout response here; it can race with handlers and
+// cause "ERR_HTTP_HEADERS_SENT" if a handler responds later.
+const slowRequestMs = Number(process.env.SLOW_REQUEST_MS || 2000);
+const logSlowRequests =
+  process.env.LOG_SLOW_REQUESTS === "1" ||
+  process.env.LOG_SLOW_REQUESTS === "true";
+const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS || 10000);
+
 app.use((req, res, next) => {
-  res.setTimeout(5000, () => {
-    if (!res.headersSent) {
-      res.status(503).json({ message: "Request timeout" });
+  // Prevent crashes if a handler writes after timeout response.
+  const originalStatus = res.status.bind(res);
+  const originalJson = res.json.bind(res);
+  const originalSend = res.send.bind(res);
+
+  res.status = (code) => {
+    if (res.headersSent || res.writableEnded) return res;
+    return originalStatus(code);
+  };
+  res.json = (payload) => {
+    if (res.headersSent || res.writableEnded) return res;
+    return originalJson(payload);
+  };
+  res.send = (payload) => {
+    if (res.headersSent || res.writableEnded) return res;
+    return originalSend(payload);
+  };
+
+  const timer = setTimeout(() => {
+    if (!res.headersSent && !res.writableEnded) {
+      res.status(504).json({ message: "Request timeout" });
+    }
+  }, requestTimeoutMs);
+
+  res.on("finish", () => clearTimeout(timer));
+  res.on("close", () => clearTimeout(timer));
+  next();
+});
+
+app.use((req, res, next) => {
+  if (!logSlowRequests) return next();
+  const startedAt = process.hrtime.bigint();
+  res.on("finish", () => {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    if (durationMs < slowRequestMs) return;
+    const payload = {
+      type: "SLOW_REQUEST",
+      duration_ms: Math.round(durationMs),
+      method: req.method,
+      url: req.originalUrl,
+      status_code: res.statusCode,
+      ip: req.ip,
+      forwarded_for: req.headers["x-forwarded-for"],
+      headers: req.headers,
+      query: req.query,
+      body: req.body,
+    };
+    try {
+      console.log(JSON.stringify(payload));
+    } catch (err) {
+      console.log("SLOW_REQUEST", {
+        ...payload,
+        log_error: err?.message || "unknown",
+      });
     }
   });
   next();
