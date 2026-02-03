@@ -116,7 +116,7 @@ const slowRequestMs = Number(process.env.SLOW_REQUEST_MS || 2000);
 const logSlowRequests =
   process.env.LOG_SLOW_REQUESTS === "1" ||
   process.env.LOG_SLOW_REQUESTS === "true";
-const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS || 10000);
+const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS || 5000);
 
 app.use((req, res, next) => {
   // Prevent crashes if a handler writes after timeout response.
@@ -139,6 +139,29 @@ app.use((req, res, next) => {
 
   const timer = setTimeout(() => {
     if (!res.headersSent && !res.writableEnded) {
+      if (logSlowRequests) {
+        const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+        const payload = {
+          type: "TIMEOUT_REQUEST",
+          duration_ms: Math.round(durationMs),
+          method: req.method,
+          url: req.originalUrl,
+          status_code: 504,
+          ip: req.ip,
+          forwarded_for: req.headers["x-forwarded-for"],
+          headers: req.headers,
+          query: req.query,
+          body: req.body,
+        };
+        try {
+          console.log(JSON.stringify(payload));
+        } catch (err) {
+          console.log("TIMEOUT_REQUEST", {
+            ...payload,
+            log_error: err?.message || "unknown",
+          });
+        }
+      }
       res.status(504).json({ message: "Request timeout" });
     }
   }, requestTimeoutMs);
