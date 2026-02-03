@@ -104,6 +104,10 @@ app.use(
     legacyHeaders: false,
     message: { message: "Too many requests, please try again later." },
     skip: (req) => req.method === "OPTIONS",
+    keyGenerator: (req) => {
+      const ip = req.ip || req.connection?.remoteAddress || "unknown";
+      return `${ip}:${req.originalUrl}`;
+    },
   })
 );
 app.use((req, res, next) => {
