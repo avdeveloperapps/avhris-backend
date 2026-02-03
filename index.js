@@ -70,24 +70,40 @@ const StatisticRoutes = require("./statistic/routes");
 const router = express.Router();
 require("./corn");
 
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-  );
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-  res.setHeader("Access-Control-Allow-Credentials", true);
-  next();
-});
+const allowedOrigins = (process.env.CORS_ORIGINS ||
+  "https://avhris-backoffice.fly.dev")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Origin",
+      "X-Requested-With",
+      "Content-Type",
+      "Accept",
+      "Authorization",
+    ],
+  })
+);
+app.options("*", cors());
 
 app.use(
   rateLimit({
     windowMs: 60 * 1000,
-    max: 5,
+    max: 60,
     standardHeaders: true,
     legacyHeaders: false,
     message: { message: "Too many requests, please try again later." },
+    skip: (req) => req.method === "OPTIONS",
   })
 );
 app.use((req, res, next) => {
