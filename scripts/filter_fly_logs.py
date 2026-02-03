@@ -15,7 +15,7 @@ def parse_args():
         "--contains",
         type=str,
         default="",
-        help="Substring that must appear in message (optional)",
+        help="Substring that must appear in message (optional, case-insensitive)",
     )
     return parser.parse_args()
 
@@ -53,8 +53,9 @@ def main():
             continue
         if ts_dt < cutoff:
             continue
-        if args.contains and args.contains not in msg:
-            continue
+        if args.contains:
+            if args.contains.lower() not in msg.lower():
+                continue
         print(f"{ts} {msg}")
 
 
