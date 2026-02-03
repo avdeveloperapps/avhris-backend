@@ -17,6 +17,12 @@ def parse_args():
         default="",
         help="Substring that must appear in message (optional, case-insensitive)",
     )
+    parser.add_argument(
+        "--types",
+        type=str,
+        default="",
+        help="Comma-separated list of log types to include (optional)",
+    )
     return parser.parse_args()
 
 
@@ -42,6 +48,12 @@ def main():
     cutoff = datetime.now(timezone.utc) - timedelta(hours=args.hours)
     data = sys.stdin.read()
 
+    allowed_types = {
+        item.strip()
+        for item in args.types.split(",")
+        if item.strip()
+    }
+
     for obj in iter_json_objects(data):
         ts = obj.get("timestamp")
         msg = obj.get("message", "")
@@ -53,6 +65,10 @@ def main():
             continue
         if ts_dt < cutoff:
             continue
+        if allowed_types:
+            log_type = obj.get("type")
+            if log_type not in allowed_types:
+                continue
         if args.contains:
             if args.contains.lower() not in msg.lower():
                 continue
