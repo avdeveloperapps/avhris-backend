@@ -22,8 +22,14 @@ module.exports = {
       }).lean();
 
       if (!activePeriod) {
-        return res.status(404).send({
-          message: "Active periodic data not found for this company",
+        return res.status(200).send({
+          message: "Tidak ada periodik aktif di company tersebut",
+          data: [],
+          meta: {
+            total: 0,
+            totalPages: 0,
+            currentPage: Math.max(parseInt(req.query.page, 10) || 1, 1),
+          },
         });
       }
 
