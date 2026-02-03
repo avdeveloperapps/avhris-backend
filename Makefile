@@ -10,4 +10,4 @@ logs-slow:
 	flyctl logs -a $(APP_NAME) --no-tail --json | python3 scripts/filter_fly_logs.py --hours 12 --contains slow_request
 
 fly-logs-slow-12h:
-	flyctl logs -a $(APP_NAME) --no-tail --json | python3 scripts/filter_fly_logs.py --hours 12 --contains slow_request
+	flyctl logs -a $(APP_NAME) --no-tail --json | python3 scripts/filter_fly_logs.py --hours 12 | rg -e '"type":"SLOW_REQUEST"|"type":"TIMEOUT_REQUEST"'
