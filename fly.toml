@@ -10,6 +10,7 @@ primary_region = 'sin'
 
 [env]
   TZ = 'Asia/Makassar'
+  PORT = '7000'
 
 [[mounts]]
   source = 'data'
