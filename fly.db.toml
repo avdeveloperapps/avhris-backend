@@ -5,7 +5,7 @@ app = "avhris-database"
 primary_region = "sin"
 
 [build]
-image = "mongo:6.0"
+image = "mongo:8.0"
 
 [experimental]
 auto_rollback = true
@@ -16,7 +16,7 @@ cmd = ["mongod", "--ipv6", "--bind_ip_all"]
 
 [[mounts]]
 # Use the existing 2GB volume (db_storage2 => vol_vx2d39k9n37gngjr) to avoid creating new storage.
-source = "vol_vx2d39k9n37gngjr"
+source = "db_storage2"
 destination = "/data/db"
 
 [[services]]
@@ -26,6 +26,8 @@ processes = ["app"]
 auto_start_machines = true
 auto_stop_machines = false
 min_machines_running = 1
+  [[services.ports]]
+  port = 27017
 
   [services.concurrency]
   type = "connections"

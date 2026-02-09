@@ -11,3 +11,6 @@ logs-slow:
 
 fly-logs-slow-12h:
 	flyctl logs -a $(APP_NAME) --no-tail --json | python3 scripts/filter_fly_logs.py --hours 12 --types SLOW_REQUEST,TIMEOUT_REQUEST
+
+deploy-db: 
+	flyctl deploy -c fly.db.toml -a avhris-database
