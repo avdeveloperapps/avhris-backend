@@ -11,6 +11,7 @@ primary_region = 'sin'
 [env]
   TZ = 'Asia/Makassar'
   PORT = '7000'
+  CORS_ORIGINS='https://avhris-backoffice.fly.dev,http://localhost:8080,http://127.0.0.1:8080'
 
 [[mounts]]
   source = 'data'
