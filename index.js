@@ -76,10 +76,19 @@ const allowedOrigins = (process.env.CORS_ORIGINS ||
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const isLocalhostOrigin = (origin) => {
+  if (!origin) return false;
+  return (
+    /^http:\/\/localhost:\d+$/.test(origin) ||
+    /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)
+  );
+};
+
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (isLocalhostOrigin(origin)) return callback(null, true);
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
