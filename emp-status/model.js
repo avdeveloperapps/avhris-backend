@@ -18,4 +18,6 @@ const EmpStatusSchema = mongoose.Schema({
   },
 });
 
+EmpStatusSchema.index({ company_id: 1 });
+
 module.exports = mongoose.model("emp-status", EmpStatusSchema);

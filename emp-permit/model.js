@@ -31,4 +31,7 @@ const LeaveRequestSchema = new Schema({
   },
 });
 
+LeaveRequestSchema.index({ company_id: 1, emppermit_status: 1 });
+LeaveRequestSchema.index({ emp_id: 1 });
+
 module.exports = mongoose.model("emp-permit", LeaveRequestSchema);

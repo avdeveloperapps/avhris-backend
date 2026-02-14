@@ -73,4 +73,9 @@ const PayrunSchema = mongoose.Schema({
     default: null,
   },
 });
+
+PayrunSchema.index({ company_id: 1, payrun_period: 1 });
+PayrunSchema.index({ emp_id: 1, payrun_period: 1 });
+PayrunSchema.index({ company_id: 1, payrun_status: 1 });
+
 module.exports = mongoose.model("payrun", PayrunSchema);

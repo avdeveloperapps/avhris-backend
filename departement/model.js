@@ -32,4 +32,6 @@ const DepartementSchema = new Schema({
   },
 });
 
+DepartementSchema.index({ company_id: 1 });
+
 module.exports = mongoose.model("Departement", DepartementSchema);

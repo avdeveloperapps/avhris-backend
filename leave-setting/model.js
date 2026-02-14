@@ -24,4 +24,6 @@ const LeaveSchema = new Schema({
   },
 });
 
+LeaveSchema.index({ company_id: 1 });
+
 module.exports = mongoose.model("leave_setting", LeaveSchema);

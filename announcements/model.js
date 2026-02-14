@@ -32,4 +32,6 @@ const LeaveHolSchema = new Schema({
   },
 });
 
+LeaveHolSchema.index({ company_id: 1, announcement_startdate: 1 });
+
 module.exports = mongoose.model("announcements", LeaveHolSchema);

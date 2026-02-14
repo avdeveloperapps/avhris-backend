@@ -20,4 +20,6 @@ const BankSchema = new Schema({
   },
 });
 
+BankSchema.index({ emp_id: 1 });
+
 module.exports = mongoose.model("Bank", BankSchema);

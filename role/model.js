@@ -27,4 +27,6 @@ const RolesSchema = new Schema(
   { collection: "roles" }
 );
 
+RolesSchema.index({ company_id: 1 });
+
 module.exports = mongoose.model("Role", RolesSchema);

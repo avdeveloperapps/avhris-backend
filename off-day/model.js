@@ -98,4 +98,8 @@ const outsideSchema = mongoose.Schema(
   { collection: "emp-offdays" }
 );
 
+outsideSchema.index({ company_id: 1, offday_status: 1 });
+outsideSchema.index({ company_id: 1, emp_id: 1, offday_status: 1 });
+outsideSchema.index({ emp_id: 1, offday_date: 1 });
+
 module.exports = mongoose.model("ChangeOffDay", outsideSchema);

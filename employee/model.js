@@ -230,5 +230,12 @@ EmployementSchema.index({ company_id: 1, "emp_attadance.kamis.off_day": 1 });
 EmployementSchema.index({ company_id: 1, "emp_attadance.jumat.off_day": 1 });
 EmployementSchema.index({ company_id: 1, "emp_attadance.sabtu.off_day": 1 });
 EmployementSchema.index({ company_id: 1, "emp_attadance.minggu.off_day": 1 });
+EmployementSchema.index({ company_id: 1 });
+EmployementSchema.index({ company_id: 1, emp_status: 1 });
+EmployementSchema.index({ company_id: 1, emp_depid: 1 });
+EmployementSchema.index({ company_id: 1, emp_desid: 1 });
+EmployementSchema.index({ email: 1 });
+EmployementSchema.index({ username: 1 });
+EmployementSchema.index({ emp_nikktp: 1 });
 
 module.exports = mongoose.model("Employmeent", EmployementSchema);

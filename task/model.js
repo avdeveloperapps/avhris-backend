@@ -68,4 +68,6 @@ const NotifSchema = mongoose.Schema(
   { timestamps: true }
 );
 
+NotifSchema.index({ company_id: 1, task_status: 1, createdAt: 1 });
+
 module.exports = mongoose.model("task", NotifSchema);

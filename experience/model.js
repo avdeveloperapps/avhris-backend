@@ -24,4 +24,6 @@ const DepartementSchema = new Schema({
   },
 });
 
+DepartementSchema.index({ emp_id: 1 });
+
 module.exports = mongoose.model("Experience", DepartementSchema);

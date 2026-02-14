@@ -22,4 +22,6 @@ const DesignationSchema = new Schema({
   },
 });
 
+DesignationSchema.index({ company_id: 1 });
+
 module.exports = mongoose.model("Designation", DesignationSchema);

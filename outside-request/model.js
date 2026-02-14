@@ -84,4 +84,8 @@ const outsideSchema = mongoose.Schema({
   },
 });
 
+outsideSchema.index({ company_id: 1, outside_status: 1 });
+outsideSchema.index({ company_id: 1, emp_id: 1, outside_status: 1 });
+outsideSchema.index({ emp_id: 1, outside_start_date: 1 });
+
 module.exports = mongoose.model("emp-outside-request", outsideSchema);

@@ -29,4 +29,7 @@ const latelySchema = mongoose.Schema({
   },
 });
 
+latelySchema.index({ company_id: 1 });
+latelySchema.index({ lately_formula: 1 });
+
 module.exports = mongoose.model("attendance_lately", latelySchema);

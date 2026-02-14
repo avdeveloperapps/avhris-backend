@@ -26,4 +26,6 @@ const LocationSchema = mongoose.Schema({
   },
 });
 
+LocationSchema.index({ company_id: 1 });
+
 module.exports = mongoose.model("attendance_location", LocationSchema);

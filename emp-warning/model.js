@@ -30,4 +30,7 @@ const EmpStatusSchema = mongoose.Schema({
   },
 });
 
+EmpStatusSchema.index({ company_id: 1 });
+EmpStatusSchema.index({ emp_id: 1 });
+
 module.exports = mongoose.model("emp-warning", EmpStatusSchema);

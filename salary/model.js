@@ -24,4 +24,6 @@ const SalarySchema = new Schema({
   },
 });
 
+SalarySchema.index({ emp_id: 1 });
+
 module.exports = mongoose.model("Salary", SalarySchema);

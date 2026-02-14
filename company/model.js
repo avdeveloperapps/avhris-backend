@@ -76,4 +76,6 @@ const CompanySchema = new Schema({
   },
 });
 
+CompanySchema.index({ company_email: 1 });
+
 module.exports = mongoose.model("Company", CompanySchema);

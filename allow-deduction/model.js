@@ -22,4 +22,7 @@ const AllowDeducSchema = new Schema({
   },
 });
 
+AllowDeducSchema.index({ company_id: 1 });
+AllowDeducSchema.index({ company_id: 1, ad_type: 1 });
+
 module.exports = mongoose.model("allowdeduct", AllowDeducSchema);

@@ -44,4 +44,8 @@ const PayrunTypeSchema = mongoose.Schema(
   { timestamps: true }
 );
 
+PayrunTypeSchema.index({ company_id: 1, payrun_type: 1 });
+PayrunTypeSchema.index({ company_id: 1, is_default: 1 });
+PayrunTypeSchema.index({ company_id: 1, is_active: 1 });
+
 module.exports = mongoose.model("PayrunType", PayrunTypeSchema);

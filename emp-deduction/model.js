@@ -29,4 +29,6 @@ const AllowSchema = new Schema({
   },
 });
 
+AllowSchema.index({ emp_id: 1 });
+
 module.exports = mongoose.model("emp_deduction", AllowSchema);

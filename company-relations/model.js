@@ -13,4 +13,6 @@ const CompanyRelationsSchema = new Schema(
   { collection: "company_relations" }
 );
 
+CompanyRelationsSchema.index({ companies: 1 });
+
 module.exports = mongoose.model("CompanyRelations", CompanyRelationsSchema);

@@ -17,4 +17,6 @@ const requestSchema = mongoose.Schema({
   },
 });
 
+requestSchema.index({ request_data_id: 1 });
+
 module.exports = mongoose.model("request", requestSchema);

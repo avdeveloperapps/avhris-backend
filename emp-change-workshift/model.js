@@ -106,4 +106,8 @@ const ChangeShift = mongoose.Schema(
   { collection: "emp-change-shifts" }
 );
 
+ChangeShift.index({ company_id: 1, empchange_status: 1 });
+ChangeShift.index({ company_id: 1, emp_id: 1, empchange_status: 1 });
+ChangeShift.index({ emp_id: 1, empchange_date_request: 1 });
+
 module.exports = mongoose.model("ChangeShift", ChangeShift);

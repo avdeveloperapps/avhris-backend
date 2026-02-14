@@ -737,4 +737,6 @@ const ShiftSchema = new Schema({
   },
 });
 
+ShiftSchema.index({ company_id: 1, shift_type: 1 });
+
 module.exports = mongoose.model("shift", ShiftSchema);

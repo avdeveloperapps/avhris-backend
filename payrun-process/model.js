@@ -38,4 +38,6 @@ const payrunProcessSchema = mongoose.Schema(
   { timestamps: true }
 );
 
+payrunProcessSchema.index({ company_id: 1, period: 1 });
+
 module.exports = mongoose.model("PayrunProcess", payrunProcessSchema);

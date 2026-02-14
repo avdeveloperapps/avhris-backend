@@ -35,4 +35,7 @@ const BankPayrunSchema = mongoose.Schema(
   { timestamps: true }
 );
 
+BankPayrunSchema.index({ company_id: 1, is_default: 1 });
+BankPayrunSchema.index({ company_id: 1, is_active: 1 });
+
 module.exports = mongoose.model("BankPayrun", BankPayrunSchema);

@@ -94,4 +94,8 @@ const overtimeSchema = mongoose.Schema({
   },
 });
 
+overtimeSchema.index({ company_id: 1, overtime_status: 1 });
+overtimeSchema.index({ company_id: 1, emp_id: 1, overtime_status: 1 });
+overtimeSchema.index({ emp_id: 1, overtime_date: 1 });
+
 module.exports = mongoose.model("emp-overtime-leave", overtimeSchema);

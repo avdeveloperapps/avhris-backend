@@ -37,4 +37,6 @@ const UsersSchema = new Schema(
   { collection: "users" }
 );
 
+UsersSchema.index({ company_id: 1, status: 1 });
+
 module.exports = mongoose.model("Users", UsersSchema);
