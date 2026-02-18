@@ -478,6 +478,7 @@ module.exports = {
       const { role } = req.admin;
       const { id } = req.params;
       if (
+        role === "Staff" ||
         role === "Super Admin" ||
         role === "App Admin" ||
         role === "Group Admin"
