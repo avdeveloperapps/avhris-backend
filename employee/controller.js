@@ -399,6 +399,7 @@ module.exports = {
       const { role } = req.admin;
       const {
         username,
+        company_id,
         emp_nik_karyawan,
         emp_depid,
         emp_desid,
@@ -420,6 +421,7 @@ module.exports = {
             {
               $set: {
                 username,
+                company_id,
                 emp_nik_karyawan,
                 emp_depid,
                 emp_desid,
@@ -450,6 +452,7 @@ module.exports = {
           {
             $set: {
               username,
+              company_id,
               emp_nik_karyawan,
               emp_depid,
               emp_desid,
