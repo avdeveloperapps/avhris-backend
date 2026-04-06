@@ -15,8 +15,8 @@ cmd = ["mongod", "--ipv6", "--bind_ip_all"]
   secrets = {}
 
 [[mounts]]
-# Use the existing 2GB volume (db_storage2 => vol_vx2d39k9n37gngjr) to avoid creating new storage.
-source = "db_storage2"
+# Active MongoDB data volume on Fly.io.
+source = "db_storage_final"
 destination = "/data/db"
 
 [[services]]
