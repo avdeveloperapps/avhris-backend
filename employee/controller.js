@@ -19,6 +19,10 @@ const Bank = require("../bank/model");
 const { calculateAttendanceAbsent } = require("../corn/index");
 const { dateToday, getDayName } = require("../attedance/controller");
 
+function canAccessAccountSettings(role) {
+  return ["Super Admin", "App Admin", "Group Admin"].includes(role);
+}
+
 module.exports = {
   addEmployement: async (req, res) => {
     try {
@@ -182,13 +186,18 @@ module.exports = {
   getEmployment: async (req, res) => {
     try {
       const { role } = req.admin;
-      // const company_id = req.query.company;
-      // role === "Super Admin " || role === "Group Admin"
-      // ? req.query.company
-      // : req.admin.company_id;
-      const employment = await Employment.find()
+      const selectedCompanyId = req.query.company || req.query.company_id;
+      const query = {};
+
+      if (selectedCompanyId) {
+        query.company_id = selectedCompanyId;
+      } else if (role !== "Super Admin" && role !== "Group Admin") {
+        query.company_id = req.admin.company_id;
+      }
+
+      const employment = await Employment.find(query)
         .select(
-          "company_id emp_fullname emp_desid emp_depid emp_status emp_profile"
+          "company_id username email emp_fullname emp_depid emp_desid emp_status emp_profile emp_attendance_status emp_employment_status emp_payroll_status"
         )
         .populate({ path: "company_id", select: "company_name" })
         .populate({ path: "emp_depid", select: "dep_name dep_workshift" })
@@ -196,10 +205,44 @@ module.exports = {
           path: "emp_status",
           select: "empstatus_name empstatus_color",
         })
-        .populate({ path: "emp_desid", select: "des_name" });
+        .populate({ path: "emp_desid", select: "des_name" })
+        .sort({ emp_fullname: 1, username: 1 });
       return res.status(200).json(employment);
     } catch (error) {
       res.status(500).json({ message: "Failed to Get Employment" });
+    }
+  },
+  getEmploymentAccounts: async (req, res) => {
+    try {
+      const { role } = req.admin;
+      const selectedCompanyId = req.query.company || req.query.company_id;
+      const query = {};
+
+      if (!canAccessAccountSettings(role)) {
+        return res.status(403).json({ message: "You don't have access" });
+      }
+
+      if (selectedCompanyId) {
+        query.company_id = selectedCompanyId;
+      } else if (role !== "Super Admin" && role !== "Group Admin") {
+        query.company_id = req.admin.company_id;
+      }
+
+      const employment = await Employment.find(query)
+        .select(
+          "company_id username email emp_fullname emp_depid emp_desid emp_status emp_profile emp_attendance_status emp_employment_status emp_payroll_status"
+        )
+        .populate({ path: "company_id", select: "company_name" })
+        .populate({ path: "emp_depid", select: "dep_name dep_workshift" })
+        .populate({
+          path: "emp_status",
+          select: "empstatus_name empstatus_color",
+        })
+        .populate({ path: "emp_desid", select: "des_name" })
+        .sort({ emp_fullname: 1, username: 1 });
+      return res.status(200).json(employment);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to Get Employment Accounts" });
     }
   },
   deleteEmployment: async (req, res) => {
@@ -579,11 +622,7 @@ module.exports = {
     try {
       const { role } = req.admin;
       const { id } = req.params;
-      if (
-        role === "Super Admin" ||
-        role === "App Admin" ||
-        role === "Group Admin"
-      ) {
+      if (canAccessAccountSettings(role)) {
         const updateStatus = await Employment.updateOne(
           { _id: id },
           {
@@ -601,6 +640,7 @@ module.exports = {
           .status(422)
           .json({ message: "Opps No field change, Please try again!" });
       }
+      return res.status(403).json({ message: "You don't have access" });
     } catch (error) {
       return res
         .status(500)

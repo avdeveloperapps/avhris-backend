@@ -6,7 +6,30 @@ const validator = (value) => {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{6,}$/.test(value);
 };
 
+function canAccessAccountSettings(role) {
+  return ["Super Admin", "App Admin", "Group Admin"].includes(role);
+}
+
 module.exports = {
+  getAdmins: async (req, res) => {
+    try {
+      const { role } = req.admin;
+
+      if (!canAccessAccountSettings(role)) {
+        return res.status(403).json({ message: "You don't have access" });
+      }
+
+      const admins = await Admin.find({})
+        .select("_id name email role status company_id")
+        .populate({ path: "company_id", select: "company_name" })
+        .sort({ name: 1, email: 1 });
+
+      return res.status(200).json(admins);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ message: "Failed to Get Admin Accounts" });
+    }
+  },
   registerAdmin: async (req, res) => {
     try {
       let { email, password } = req.body;
@@ -68,6 +91,39 @@ module.exports = {
         .json({ message: "Your password or email maybe wrong" });
     } catch (error) {
       console.log(error);
+    }
+  },
+  resetAdminPassword: async (req, res) => {
+    try {
+      const { role } = req.admin;
+      const { password } = req.body;
+
+      if (!canAccessAccountSettings(role)) {
+        return res.status(403).json({ message: "You don't have access" });
+      }
+
+      if (!password) {
+        return res.status(422).json({ message: "Password is required" });
+      }
+
+      const hashedPassword = bcrypt.hashSync(password, 10);
+      const updatedAdmin = await Admin.updateOne(
+        { _id: req.params.id },
+        { $set: { password: hashedPassword } }
+      );
+
+      if (updatedAdmin.modifiedCount > 0) {
+        return res
+          .status(200)
+          .json({ message: "Successfully Reset Admin Password" });
+      }
+
+      return res
+        .status(422)
+        .json({ message: "Opps No field change, Please try again!" });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ message: "Failed Reset Password Admin" });
     }
   },
 };

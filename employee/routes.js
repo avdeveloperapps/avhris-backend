@@ -3,6 +3,7 @@ const { authenticationToken } = require("../middleware/authentication");
 const {
   addEmployement,
   getEmployment,
+  getEmploymentAccounts,
   detailEmployment,
   editPesonalDetail,
   editCutiDetail,
@@ -65,6 +66,7 @@ router.post("/upload", upload.array("files", 5), uploadPhoto);
 
 router.post("/", authenticationToken, upload.single("profile"), addEmployement);
 router.get("/", authenticationToken, getEmployment);
+router.get("/accounts", authenticationToken, getEmploymentAccounts);
 router.get("/:id", authenticationToken, detailEmployment);
 router.delete("/:id", authenticationToken, deleteEmployment);
 router.put("/personal-detail/:id", authenticationToken, editPesonalDetail);

@@ -13,6 +13,10 @@ const validator = (value) => {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{6,}$/.test(value);
 };
 
+function canAccessAccountSettings(role) {
+  return ["Super Admin", "App Admin", "Group Admin"].includes(role);
+}
+
 async function TotalStatusEmplyoment(company_id) {
   const employment = await Employment.find({ company_id });
   const status = await Status.find({ company_id });
@@ -247,6 +251,86 @@ module.exports = {
       return res.status(200).json(company);
     } catch (error) {
       console.log(error);
+    }
+  },
+  getCompanyAccounts: async (req, res) => {
+    try {
+      const { company_group, company_id, role } = req.admin;
+      let findCompany = {};
+
+      if (!canAccessAccountSettings(role)) {
+        return res.status(403).json({ message: "You don't have access" });
+      }
+
+      if (req.query.company_id) {
+        findCompany = { _id: req.query.company_id };
+      } else if (
+        role !== "Super Admin" &&
+        role !== "Group Admin" &&
+        company_id
+      ) {
+        findCompany = { _id: company_id };
+      } else if (company_group) {
+        const compRel = await CompanyRelations.findOne({
+          companies: { $in: [company_id] },
+        });
+
+        if (compRel) {
+          findCompany = { _id: { $in: compRel.companies } };
+        } else {
+          findCompany = { _id: company_id };
+        }
+      } else {
+        findCompany = { company_group: "Mufidah Group" };
+      }
+
+      const companies = await Company.find(findCompany)
+        .select(
+          "_id company_name company_group company_email company_status company_header company_canpayroll"
+        )
+        .sort({ company_name: 1 });
+
+      return res.status(200).json(companies);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ message: "Failed to Get Company Accounts" });
+    }
+  },
+  resetCompanyPassword: async (req, res) => {
+    try {
+      const { role } = req.admin;
+      const { password } = req.body;
+
+      if (!canAccessAccountSettings(role)) {
+        return res.status(403).json({ message: "You don't have access" });
+      }
+
+      if (!password) {
+        return res.status(422).json({ message: "Password is required" });
+      }
+
+      const company_password = bcrypt.hashSync(password, 10);
+      const company = await Company.updateOne(
+        { _id: req.params.id },
+        {
+          $set: {
+            company_password,
+          },
+        }
+      );
+
+      if (company.modifiedCount > 0) {
+        return res
+          .status(200)
+          .json({ message: "Successfully Reset Company Password" });
+      }
+
+      return res
+        .status(422)
+        .json({ message: "Opps No field change, Please try again!" });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ message: "Failed Reset Password Company" });
     }
   },
   dahsboard: async (req, res) => {
