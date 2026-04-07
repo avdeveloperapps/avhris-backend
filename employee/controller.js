@@ -215,20 +215,12 @@ module.exports = {
   getEmploymentAccounts: async (req, res) => {
     try {
       const { role } = req.admin;
-      const selectedCompanyId = req.query.company || req.query.company_id;
-      const query = {};
 
       if (!canAccessAccountSettings(role)) {
         return res.status(403).json({ message: "You don't have access" });
       }
 
-      if (selectedCompanyId) {
-        query.company_id = selectedCompanyId;
-      } else if (role !== "Super Admin" && role !== "Group Admin") {
-        query.company_id = req.admin.company_id;
-      }
-
-      const employment = await Employment.find(query)
+      const employment = await Employment.find({})
         .select(
           "company_id username email emp_fullname emp_depid emp_desid emp_status emp_profile emp_attendance_status emp_employment_status emp_payroll_status"
         )

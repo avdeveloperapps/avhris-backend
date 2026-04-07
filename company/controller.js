@@ -255,36 +255,13 @@ module.exports = {
   },
   getCompanyAccounts: async (req, res) => {
     try {
-      const { company_group, company_id, role } = req.admin;
-      let findCompany = {};
+      const { role } = req.admin;
 
       if (!canAccessAccountSettings(role)) {
         return res.status(403).json({ message: "You don't have access" });
       }
 
-      if (req.query.company_id) {
-        findCompany = { _id: req.query.company_id };
-      } else if (
-        role !== "Super Admin" &&
-        role !== "Group Admin" &&
-        company_id
-      ) {
-        findCompany = { _id: company_id };
-      } else if (company_group) {
-        const compRel = await CompanyRelations.findOne({
-          companies: { $in: [company_id] },
-        });
-
-        if (compRel) {
-          findCompany = { _id: { $in: compRel.companies } };
-        } else {
-          findCompany = { _id: company_id };
-        }
-      } else {
-        findCompany = { company_group: "Mufidah Group" };
-      }
-
-      const companies = await Company.find(findCompany)
+      const companies = await Company.find({})
         .select(
           "_id company_name company_group company_email company_status company_header company_canpayroll"
         )
