@@ -16,4 +16,7 @@ deploy-db:
 	flyctl deploy -c fly.db.toml -a avhris-database
 
 migrate-r2-files:
+	R2_MIGRATION_SOURCE=fly FLY_APP_NAME=$(APP_NAME) node scripts/migrate_local_files_to_r2.js
+
+migrate-r2-files-local:
 	node scripts/migrate_local_files_to_r2.js

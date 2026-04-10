@@ -1,14 +1,14 @@
-require("dotenv").config();
-
-const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
-const DEFAULT_PUBLIC_BASE_URL = "https://storage.avgroup.my.id";
-const DEFAULT_DIRECTORY = "avhris";
 const SIGNING_ALGORITHM = "AWS4-HMAC-SHA256";
 const SIGNING_SERVICE = "s3";
 const SIGNING_REGION = "auto";
+
+function printProgress(message) {
+  console.log(`[${new Date().toISOString()}] ${message}`);
+}
 
 function getRequiredEnv(name) {
   const value = process.env[name];
@@ -30,54 +30,14 @@ function normalizePathPart(value = "") {
     .join("/");
 }
 
-function getR2Directory() {
-  return trimSlashes(process.env.CLOUDFLARE_R2_DIRECTORY || DEFAULT_DIRECTORY);
-}
-
-function getPublicBaseUrl() {
-  return (
-    process.env.CLOUDFLARE_R2_PUBLIC_BASE_URL || DEFAULT_PUBLIC_BASE_URL
-  ).replace(/\/+$/, "");
-}
-
-function isR2Configured() {
-  return Boolean(
-    process.env.CLOUDFLARE_R2_BUCKET &&
-      process.env.CLOUDFLARE_R2_ENDPOINT &&
-      process.env.CLOUDFLARE_R2_ACCESS_KEY_ID &&
-      process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY
-  );
-}
-
-function getBucketName() {
-  return getRequiredEnv("CLOUDFLARE_R2_BUCKET");
-}
-
-function getEndpointUrl() {
-  return (
-    process.env.CLOUDFLARE_R2_ENDPOINT ||
-    `https://${getRequiredEnv("CLOUDFLARE_R2_ACCOUNT_ID")}.r2.cloudflarestorage.com`
-  );
-}
-
 function buildObjectKey(folder, storedName) {
-  return [getR2Directory(), normalizePathPart(folder), normalizePathPart(storedName)]
+  return [
+    trimSlashes(process.env.CLOUDFLARE_R2_DIRECTORY || "avhris"),
+    normalizePathPart(folder),
+    normalizePathPart(storedName),
+  ]
     .filter(Boolean)
     .join("/");
-}
-
-function getPublicUrl(folder, storedName) {
-  if (!storedName) {
-    return null;
-  }
-  if (/^https?:\/\//i.test(storedName)) {
-    return storedName;
-  }
-  const encodedPath = buildObjectKey(folder, storedName)
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-  return `${getPublicBaseUrl()}/${encodedPath}`;
 }
 
 function detectContentType(fileName, fallback = "application/octet-stream") {
@@ -95,7 +55,6 @@ function detectContentType(fileName, fallback = "application/octet-stream") {
     ".txt": "text/plain",
     ".json": "application/json",
   };
-
   return contentTypeMap[extension] || fallback;
 }
 
@@ -125,15 +84,11 @@ function escapePathSegment(segment) {
 function joinUrlPath(basePath, bucket, objectKey) {
   const parts = [String(basePath || "").replace(/\/+$/, ""), escapePathSegment(bucket)];
   for (const segment of String(objectKey || "").split("/")) {
-    if (!segment) {
-      continue;
-    }
+    if (!segment) continue;
     parts.push(escapePathSegment(segment));
   }
   let joined = parts.join("/");
-  if (!joined.startsWith("/")) {
-    joined = `/${joined}`;
-  }
+  if (!joined.startsWith("/")) joined = `/${joined}`;
   return joined;
 }
 
@@ -142,26 +97,27 @@ function buildAmzDate(now = new Date()) {
   return iso.slice(0, 15) + "Z";
 }
 
-async function signedRequest({ method, objectKey, body = Buffer.alloc(0), contentType }) {
-  const endpoint = new URL(getEndpointUrl());
-  const bucketName = getBucketName();
+async function signedPutObject(objectKey, body, contentType) {
+  const endpoint = new URL(
+    process.env.CLOUDFLARE_R2_ENDPOINT ||
+      `https://${getRequiredEnv("CLOUDFLARE_R2_ACCOUNT_ID")}.r2.cloudflarestorage.com`
+  );
+  const bucketName = getRequiredEnv("CLOUDFLARE_R2_BUCKET");
   const accessKeyId = getRequiredEnv("CLOUDFLARE_R2_ACCESS_KEY_ID");
   const secretAccessKey = getRequiredEnv("CLOUDFLARE_R2_SECRET_ACCESS_KEY");
-  const payload = Buffer.isBuffer(body) ? body : Buffer.from(body || "");
-  const now = new Date();
-  const amzDate = buildAmzDate(now);
+  const payloadHash = sha256Hex(body);
+  const amzDate = buildAmzDate(new Date());
   const dateStamp = amzDate.slice(0, 8);
-  const payloadHash = sha256Hex(payload);
   const requestPath = joinUrlPath(endpoint.pathname, bucketName, objectKey);
   const canonicalHeaders = [
-    `content-type:${contentType || "application/octet-stream"}`,
+    `content-type:${contentType}`,
     `host:${endpoint.host}`,
     `x-amz-content-sha256:${payloadHash}`,
     `x-amz-date:${amzDate}`,
   ].join("\n");
   const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
   const canonicalRequest = [
-    method,
+    "PUT",
     requestPath,
     "",
     `${canonicalHeaders}\n`,
@@ -186,72 +142,88 @@ async function signedRequest({ method, objectKey, body = Buffer.alloc(0), conten
   ).toString("hex");
   const authorization = `${SIGNING_ALGORITHM} Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
   const response = await fetch(new URL(requestPath, endpoint).toString(), {
-    method,
+    method: "PUT",
     headers: {
       Authorization: authorization,
-      "Content-Type": contentType || "application/octet-stream",
+      "Content-Type": contentType,
       "X-Amz-Content-Sha256": payloadHash,
       "X-Amz-Date": amzDate,
     },
-    body: method === "DELETE" ? undefined : payload,
+    body,
   });
 
   if (!response.ok) {
     const responseBody = await response.text();
     throw new Error(
-      `R2 ${method} failed: status=${response.status} body=${responseBody.trim()}`
+      `R2 PUT failed: status=${response.status} body=${responseBody.trim()}`
     );
   }
-
-  return response;
 }
 
-async function uploadBuffer({ folder, fileName, buffer, contentType }) {
-  const objectKey = buildObjectKey(folder, fileName);
-  await signedRequest({
-    method: "PUT",
-    objectKey,
-    body: buffer,
-    contentType: detectContentType(fileName, contentType),
+async function getFilesRecursively(directoryPath) {
+  const entries = await fs.promises.readdir(directoryPath, {
+    withFileTypes: true,
   });
-
-  return {
-    fileName,
-    objectKey,
-    url: getPublicUrl(folder, fileName),
-  };
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = path.join(directoryPath, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await getFilesRecursively(fullPath)));
+      continue;
+    }
+    if (entry.isFile()) {
+      files.push(fullPath);
+    }
+  }
+  return files;
 }
 
-async function uploadLocalFile({ folder, localPath, fileName, contentType }) {
-  const body = await fs.promises.readFile(localPath);
-  return uploadBuffer({
-    folder,
-    fileName,
-    buffer: body,
-    contentType: detectContentType(fileName, contentType),
-  });
-}
-
-async function deleteObject(folder, storedName) {
-  if (!storedName || /^https?:\/\//i.test(storedName)) {
-    return;
+async function uploadFolder(baseRoot, folder) {
+  const targetRoot = path.join(baseRoot, folder);
+  if (!fs.existsSync(targetRoot)) {
+    printProgress(`Skipping folder=${folder}, source not found`);
+    return { total: 0, success: 0, failed: 0 };
   }
 
-  await signedRequest({
-    method: "DELETE",
-    objectKey: buildObjectKey(folder, storedName),
-    contentType: "application/octet-stream",
-  });
+  const files = await getFilesRecursively(targetRoot);
+  printProgress(`Starting direct Fly upload for folder=${folder}, files=${files.length}`);
+
+  let success = 0;
+  for (let index = 0; index < files.length; index += 1) {
+    const localPath = files[index];
+    const relativePath = path.relative(targetRoot, localPath).split(path.sep).join("/");
+    const objectKey = buildObjectKey(folder, relativePath);
+    try {
+      const body = await fs.promises.readFile(localPath);
+      await signedPutObject(objectKey, body, detectContentType(relativePath));
+      success += 1;
+      if (success === 1 || (index + 1) % 25 === 0 || index + 1 === files.length) {
+        printProgress(`Uploaded ${index + 1}/${files.length} files for folder=${folder}`);
+      }
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] Upload failed for folder=${folder} file=${relativePath}: ${error.message}`
+      );
+      process.exit(1);
+    }
+  }
+
+  return { total: files.length, success, failed: 0 };
 }
 
-module.exports = {
-  buildObjectKey,
-  deleteObject,
-  detectContentType,
-  getPublicBaseUrl,
-  getPublicUrl,
-  getR2Directory,
-  isR2Configured,
-  uploadBuffer,
-  uploadLocalFile,
-};
+(async () => {
+  const sourceRoot = process.env.FLY_PUBLIC_PATH || "/app/public";
+  printProgress(`Direct migration on Fly started from ${sourceRoot}`);
+  const uploadSummary = await uploadFolder(sourceRoot, "uploads");
+  const fileSummary = await uploadFolder(sourceRoot, "files");
+  const summary = {
+    total: uploadSummary.total + fileSummary.total,
+    success: uploadSummary.success + fileSummary.success,
+    failed: 0,
+  };
+  printProgress(`Direct migration finished: ${JSON.stringify(summary)}`);
+  console.log(`__SUMMARY__${JSON.stringify(summary)}`);
+})().catch((error) => {
+  console.error(`[${new Date().toISOString()}] Migration failed: ${error.message}`);
+  process.exit(1);
+});
