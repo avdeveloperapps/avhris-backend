@@ -1,5 +1,6 @@
 /node_modules
 /public/files/*
 /public/uploads/*
+/logs/
 .DS_Store
 /backups/

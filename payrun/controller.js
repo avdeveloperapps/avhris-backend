@@ -9,8 +9,9 @@ const moment = require("moment");
 const pdf = require("html-pdf");
 const Overtime = require("../overtime-request/model");
 const pdfTemplate = require("../documents/document");
-const fs = require("fs");
-const path = require("path");
+const { deleteObject, getPublicUrl, isR2Configured, uploadBuffer } = require(
+  "../utils/r2"
+);
 
 function handleCalender(periodic_start_date, periodic_end_date, formatDate) {
   let currentDate = moment(periodic_start_date);
@@ -513,9 +514,19 @@ module.exports = {
       const payrun = await Payrun.findOne({ _id: req.params.id }).populate(
         "emp_id"
       );
-      if (payrun.payrun_file && req.file?.filename) {
-        fs.unlinkSync(`public/files/${payrun.payrun_file}`);
+      if (!req.file?.filename) {
+        return res.status(422).json({
+          message: `Failed Send Payslip to ${payrun?.emp_id?.emp_fullname || "employment"}`,
+        });
       }
+
+      await uploadBuffer({
+        folder: "files",
+        fileName: req.file.filename,
+        buffer: req.file.buffer,
+        contentType: req.file.mimetype,
+      });
+
       const updateFilePdf = await Payrun.updateOne(
         { _id: req.params.id },
         {
@@ -525,6 +536,9 @@ module.exports = {
         }
       );
       if (updateFilePdf.modifiedCount > 0 && payrun?.payrun_file) {
+        await deleteObject("files", payrun.payrun_file).catch((error) => {
+          console.log("failed to delete old payrun file", error.message);
+        });
         return res.status(200).json({
           message: `Succesfully Resend Payslip to ${payrun.emp_id?.emp_fullname}`,
         });
@@ -539,8 +553,8 @@ module.exports = {
       }
       // return res.status(200).json({ message: "tes" });
     } catch (error) {
-      if (req.file) {
-        fs.unlinkSync(`public/files/${req.file.filename}`);
+      if (req.file?.filename) {
+        await deleteObject("files", req.file.filename).catch(() => null);
       }
       return res.status(422).json({
         message: `Failed Send Payslip to employment`,
@@ -577,12 +591,20 @@ module.exports = {
         format: "A4",
         orientation: "portrait",
       };
-      pdf
-        .create(pdfTemplate(payrun), options)
-        .toFile(`public/files/${pdfName}`, async (err) => {
-          if (err) {
-            return res.status(400).send(err);
-          }
+
+      pdf.create(pdfTemplate(payrun), options).toBuffer(async (err, buffer) => {
+        if (err) {
+          return res.status(400).send(err);
+        }
+
+        try {
+          await uploadBuffer({
+            folder: "files",
+            fileName: pdfName,
+            buffer,
+            contentType: "application/pdf",
+          });
+
           const updateFilePdf = await Payrun.updateOne(
             { _id: req.params.id },
             {
@@ -593,6 +615,9 @@ module.exports = {
           );
 
           if (updateFilePdf.modifiedCount > 0 && payrun?.payrun_file) {
+            await deleteObject("files", payrun.payrun_file).catch((error) => {
+              console.log("failed to delete old payrun file", error.message);
+            });
             return res.status(200).send({
               message: `Succesfully Resend Payslip to ${payrun.emp_id.emp_fullname}`,
               data: payrun,
@@ -605,13 +630,17 @@ module.exports = {
               fileName: pdfName,
             });
           } else {
+            await deleteObject("files", pdfName).catch(() => null);
             return res.status(422).send({
               message: `Failed Send Payslip to ${payrun.emp_id.emp_fullname}`,
               data: payrun,
               fileName: pdfName,
             });
           }
-        });
+        } catch (uploadError) {
+          return res.status(500).send(uploadError);
+        }
+      });
     } catch (error) {
       return res.status(500).send(error);
     }
@@ -626,11 +655,15 @@ module.exports = {
         return res.status(404).send({ message: "Payrun not found" });
       }
       const fileName = payrun.payrun_file;
-      return res
-        .status(200)
-        .sendFile(
-          path.join(path.dirname(__dirname), `public/files/${fileName}`)
-        );
+      if (!fileName) {
+        return res.status(404).send({ message: "Payrun file not found" });
+      }
+
+      if (isR2Configured()) {
+        return res.redirect(getPublicUrl("files", fileName));
+      }
+
+      return res.status(500).send({ message: "R2 is not configured" });
     } catch (error) {
       console.log(error);
       return res.status(500).send(error);

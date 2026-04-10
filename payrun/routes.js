@@ -1,5 +1,6 @@
 const express = require("express");
 const { authenticationToken } = require("../middleware/authentication");
+const { buildUploadedFilename, createMemoryUpload } = require("../utils/upload");
 const {
   generatePayrun,
   getPayrun,
@@ -14,27 +15,10 @@ const {
   downloadPdfFile,
 } = require("./controller");
 const router = express.Router();
-const multer = require("multer");
-const path = require("path");
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "public/files");
+const upload = createMemoryUpload({
+  beforeFilter: (req, file) => {
+    file.filename = buildUploadedFilename(file.originalname);
   },
-  filename: function (req, file, cb) {
-    // You could rename the file name
-    cb(
-      null,
-      file.originalname.split(".")[0] +
-        "-" +
-        Date.now() +
-        path.extname(file.originalname)
-    );
-  },
-});
-
-const upload = multer({
-  storage,
 });
 
 router.post("/", authenticationToken, generatePayrun);

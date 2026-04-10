@@ -14,3 +14,6 @@ fly-logs-slow-12h:
 
 deploy-db: 
 	flyctl deploy -c fly.db.toml -a avhris-database
+
+migrate-r2-files:
+	node scripts/migrate_local_files_to_r2.js

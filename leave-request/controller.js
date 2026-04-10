@@ -3,6 +3,7 @@ const Employment = require("../employee/model");
 const Request = require("../request/model");
 const jwt = require("jsonwebtoken");
 const Departement = require("./model");
+const { deleteObject, uploadBuffer } = require("../utils/r2");
 // function getFormattedDateTime() {
 //   const date = new Date();
 //   const year = date.getFullYear();
@@ -32,9 +33,36 @@ function getFormattedDateTime() {
   return `${year}-${month}-${day} ${hour}:${minute} ${amPm}`;
 }
 
+async function uploadAttachments(files = []) {
+  const uploadedFiles = [];
+
+  for (const file of files) {
+    await uploadBuffer({
+      folder: "uploads",
+      fileName: file.filename,
+      buffer: file.buffer,
+      contentType: file.mimetype,
+    });
+    uploadedFiles.push(file.filename);
+  }
+
+  return uploadedFiles;
+}
+
+async function cleanupAttachments(files = []) {
+  await Promise.all(
+    files.filter(Boolean).map((fileName) =>
+      deleteObject("uploads", fileName).catch((error) => {
+        console.log("failed to cleanup leave attachment", fileName, error.message);
+      })
+    )
+  );
+}
+
 module.exports = {
   getFormattedDateTime,
   addLeaveRequest: async (req, res) => {
+    let uploadedAttachments = [];
     try {
       const {
         emp_id,
@@ -53,6 +81,7 @@ module.exports = {
       const decodedToken = jwt.verify(token, process.env.SECRET_KEY);
       const { role } = decodedToken;
       const company_id = req.query.company_id;
+      uploadedAttachments = await uploadAttachments(req.files || []);
       if (
         role === "Super Admin" ||
         role === "App Admin" ||
@@ -70,6 +99,7 @@ module.exports = {
           empleave_apply_date,
           empleave_reason,
           empleave_status,
+          empleave_attachement: uploadedAttachments,
           empleave_start_hours,
           empleave_end_hours,
           empleave_fsuperior: { fsuperior_id: employement?.emp_fsuperior },
@@ -93,7 +123,10 @@ module.exports = {
           .status(200)
           .json({ message: "Successfully created a Assign Leave" });
       }
+      await cleanupAttachments(uploadedAttachments);
+      return res.status(403).json({ message: "You don't have access" });
     } catch (error) {
+      await cleanupAttachments(uploadedAttachments);
       res.status(500).json({ message: "Failed to Add new departement" });
     }
   },
@@ -304,9 +337,11 @@ module.exports = {
         role === "App Admin" ||
         role === "Group Admin"
       ) {
+        const currentLeave = await AssignLeave.findOne({ _id: id });
         const assignLeave = await AssignLeave.deleteOne({ _id: id });
         if (assignLeave.deletedCount > 0) {
           await Request.deleteOne({ request_data_id: id });
+          await cleanupAttachments(currentLeave?.empleave_attachement || []);
           return res.status(200).json({
             message: `Successfully deleted Leave request`,
           });

@@ -1,5 +1,4 @@
 const Employment = require("./model");
-const fs = require("fs");
 const Salary = require("../salary/model");
 const Company = require("../company/model");
 const Shift = require("../workshift/model");
@@ -18,13 +17,40 @@ const Education = require("../education/model");
 const Bank = require("../bank/model");
 const { calculateAttendanceAbsent } = require("../corn/index");
 const { dateToday, getDayName } = require("../attedance/controller");
+const { deleteObject, uploadBuffer } = require("../utils/r2");
 
 function canAccessAccountSettings(role) {
   return ["Super Admin", "App Admin", "Group Admin"].includes(role);
 }
 
+async function uploadProfileFile(file) {
+  if (!file) {
+    return null;
+  }
+
+  await uploadBuffer({
+    folder: "uploads",
+    fileName: file.filename,
+    buffer: file.buffer,
+    contentType: file.mimetype,
+  });
+
+  return file.filename;
+}
+
+async function cleanupUploadedProfiles(fileNames = []) {
+  await Promise.all(
+    fileNames.filter(Boolean).map((fileName) =>
+      deleteObject("uploads", fileName).catch((error) => {
+        console.log("failed to cleanup uploaded profile", fileName, error.message);
+      })
+    )
+  );
+}
+
 module.exports = {
   addEmployement: async (req, res) => {
+    let uploadedProfile = null;
     try {
       const { role, email: adminEmail } = req.admin;
       const {
@@ -96,9 +122,11 @@ module.exports = {
         company_id = req.admin.company_id;
       }
 
+      uploadedProfile = await uploadProfileFile(req.file);
+
       const newEmployment = new Employment({
         company_id,
-        emp_profile: req.file ? req.file?.filename : null,
+        emp_profile: uploadedProfile,
         username,
         password,
         email,
@@ -173,9 +201,7 @@ module.exports = {
       });
       return res.json({ message: "Successfully created a new Employment" });
     } catch (error) {
-      if (req?.file) {
-        fs.unlinkSync(`public/uploads/${req.file.filename}`);
-      }
+      await cleanupUploadedProfiles([uploadedProfile]);
       console.log(error);
       return res.status(500).json({
         message: "Failed to Add new Employment | Internal Server Error",
@@ -299,8 +325,8 @@ module.exports = {
     }
   },
   editPesonalDetail: async (req, res) => {
+    let uploadedProfile = null;
     try {
-      const { role } = req.admin;
       const {
         emp_firstname,
         emp_lastname,
@@ -314,6 +340,7 @@ module.exports = {
       } = req.body;
       const { id } = req.params;
       const findEmployment = await Employment.findOne({ _id: id });
+      uploadedProfile = await uploadProfileFile(req.file);
       // cek duplicate jika employment memperbarui email
       if (email !== findEmployment?.email) {
         const findDuplicateEmail = await Employment.findOne({ email });
@@ -322,9 +349,7 @@ module.exports = {
             { _id: id },
             {
               $set: {
-                emp_profile: req.file
-                  ? req.file?.filename
-                  : findEmployment.emp_profile,
+                emp_profile: uploadedProfile || findEmployment.emp_profile,
                 email,
                 emp_firstname,
                 emp_lastname,
@@ -339,13 +364,25 @@ module.exports = {
             }
           );
           if (newEmployment.modifiedCount > 0) {
+            if (uploadedProfile && findEmployment?.emp_profile) {
+              await deleteObject("uploads", findEmployment.emp_profile).catch(
+                (uploadError) => {
+                  console.log(
+                    "failed to delete previous employee profile",
+                    uploadError.message
+                  );
+                }
+              );
+            }
             return res.json({
               message: "Successfully updated this Employment",
             });
           } else {
+            await cleanupUploadedProfiles([uploadedProfile]);
             return res.json({ message: "No data changed" });
           }
         } else {
+          await cleanupUploadedProfiles([uploadedProfile]);
           return res
             .status(422)
             .json({ message: "Failed to update, Your email has been used" });
@@ -355,9 +392,7 @@ module.exports = {
           { _id: id },
           {
             $set: {
-              emp_profile: req.file
-                ? req.file?.filename
-                : findEmployment.emp_profile,
+              emp_profile: uploadedProfile || findEmployment.emp_profile,
               email,
               emp_firstname,
               emp_lastname,
@@ -372,18 +407,26 @@ module.exports = {
           }
         );
         if (newEmployment.modifiedCount > 0) {
+          if (uploadedProfile && findEmployment?.emp_profile) {
+            await deleteObject("uploads", findEmployment.emp_profile).catch(
+              (uploadError) => {
+                console.log(
+                  "failed to delete previous employee profile",
+                  uploadError.message
+                );
+              }
+            );
+          }
           return res.json({ message: "Successfully updated Employment" });
         } else {
+          await cleanupUploadedProfiles([uploadedProfile]);
           return res.json({ message: "No data changed" });
         }
       }
       // return res.status(500).json({ message: "Failed to Add new Employment" });
     } catch (error) {
       console.log(error);
-      if (req?.file) {
-        console.log(error);
-        fs.unlinkSync(`public/uploads/${req.file.filename}`);
-      }
+      await cleanupUploadedProfiles([uploadedProfile]);
       return res.status(500).json({ message: "Failed to Update Employment" });
     }
   },
@@ -412,20 +455,28 @@ module.exports = {
   },
 
   uploadPhoto: async (req, res) => {
+    const uploadedFiles = [];
     try {
-      console.log(req.files);
-      if (req.files.length > 0) {
+      if (req.files?.length > 0) {
+        for (const file of req.files) {
+          await uploadBuffer({
+            folder: "uploads",
+            fileName: file.filename,
+            buffer: file.buffer,
+            contentType: file.mimetype,
+          });
+          uploadedFiles.push(file.filename);
+        }
+
         return res.status(200).json({
           message: "Successfully upload files",
-          data: req.files.map((file) => file?.filename),
+          data: uploadedFiles,
         });
       } else {
         return res.status(422).json({ message: "No files uploaded" });
       }
     } catch (error) {
-      if (req?.file) {
-        fs.unlinkSync(`public/uploads/${req.file.filename}`);
-      }
+      await cleanupUploadedProfiles(uploadedFiles);
       return res.status(500).json({ message: "Failed to upload files" });
     }
   },
@@ -565,27 +616,39 @@ module.exports = {
     }
   },
   changeProfile: async (req, res) => {
+    let uploadedProfile = null;
     try {
       const { id } = req.params;
-      const { role } = req.admin;
+      const currentEmployment = await Employment.findOne({ _id: id });
+      uploadedProfile = await uploadProfileFile(req.file);
 
       const updateProfile = await Employment.updateOne(
         { _id: id },
         {
           $set: {
-            emp_profile: req?.file?.filename,
+            emp_profile: uploadedProfile,
           },
         }
       );
-      console.log(id);
+      if (updateProfile.modifiedCount > 0 && currentEmployment?.emp_profile) {
+        await deleteObject("uploads", currentEmployment.emp_profile).catch(
+          (error) => {
+            console.log(
+              "failed to delete previous employee profile",
+              error.message
+            );
+          }
+        );
+      } else if (updateProfile.modifiedCount === 0) {
+        await cleanupUploadedProfiles([uploadedProfile]);
+      }
+
       return res
         .status(200)
         .json({ message: "Successfully to update profile" });
     } catch (error) {
       console.log(error);
-      if (req?.file) {
-        fs.unlinkSync(`public/uploads/${req.file.filename}`);
-      }
+      await cleanupUploadedProfiles([uploadedProfile]);
       return res.status(500).json({ message: "Failed to upload profile" });
     }
   },

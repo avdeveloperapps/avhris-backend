@@ -44,6 +44,7 @@ const PayrunProcessRoutes = require("./payrun-process/routes");
 const OutputFileRoutes = require("./output-file/routes");
 const UsersAndRolesRoutes = require("./users-and-roles/routes");
 const StatisticRoutes = require("./statistic/routes");
+const { getPublicUrl, isR2Configured } = require("./utils/r2");
 // async function NotificationModel() {
 //   // const notif = await Task.find();
 //   // console.log(notif);
@@ -211,8 +212,19 @@ app.use((req, res, next) => {
 });
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use("/images", express.static(path.join(__dirname, "public/uploads")));
-app.use("/files", express.static(path.join(__dirname, "public/files")));
+
+if (isR2Configured()) {
+  app.get("/images/*", (req, res) => {
+    return res.redirect(getPublicUrl("uploads", req.params[0]));
+  });
+  app.get("/files/*", (req, res) => {
+    return res.redirect(getPublicUrl("files", req.params[0]));
+  });
+} else {
+  app.use("/images", express.static(path.join(__dirname, "public/uploads")));
+  app.use("/files", express.static(path.join(__dirname, "public/files")));
+}
+
 app.use("/public", express.static(path.join(__dirname, "public")));
 
 const api_version = "api/v1";

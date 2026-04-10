@@ -11,8 +11,8 @@ const moment = require("moment");
 const csvWriter = require("csv-writer");
 const CsvParser = require("json2csv").Parser;
 const excel = require("exceljs");
-const fs = require("fs");
 require("dotenv").config();
+const { getPublicUrl, uploadBuffer } = require("../utils/r2");
 
 module.exports = {
   async getPayrunProcess(req, res) {
@@ -150,11 +150,6 @@ module.exports = {
         new Date()
       ).format("HHmmss")}`;
 
-      const folderName = "public/files/payrun_process";
-      if (!fs.existsSync(folderName)) {
-        fs.mkdirSync(folderName);
-      }
-
       const typeFile = findOutputFile[0].type_file;
 
       // save to DB
@@ -273,6 +268,14 @@ module.exports = {
           );
         }
 
+        const storedPath = `payrun_process/${fileName}.csv`;
+        await uploadBuffer({
+          folder: "files",
+          fileName: storedPath,
+          buffer: Buffer.from(csvData, "utf8"),
+          contentType: "text/csv",
+        });
+
         await session.commitTransaction();
         return res
           .set({
@@ -282,6 +285,8 @@ module.exports = {
           .status(200)
           .send({
             fileName: `${fileName}.csv`,
+            path: storedPath,
+            url: getPublicUrl("files", storedPath),
             data: csvData,
             message: "Export to csv successfully",
           });
@@ -384,22 +389,25 @@ module.exports = {
           "attachment; filename=" + `${fileName}.xlsx`
         );
 
-        const exportPath = path.resolve(
-          __dirname,
-          `../${folderName}/${fileName}.xlsx`
-        );
-        await workbook.xlsx
-          .writeFile(`${folderName}/${fileName}.xlsx`)
-          .then(() => {
-            res.send({
-              status: "success",
-              message: "file successfully downloaded",
-              data: {
-                path: `${folderName}/${fileName}.xlsx`,
-                fileName: `${fileName}.xlsx`,
-              },
-            });
-          });
+        const storedPath = `payrun_process/${fileName}.xlsx`;
+        const workbookBuffer = await workbook.xlsx.writeBuffer();
+        await uploadBuffer({
+          folder: "files",
+          fileName: storedPath,
+          buffer: Buffer.from(workbookBuffer),
+          contentType:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        res.send({
+          status: "success",
+          message: "file successfully downloaded",
+          data: {
+            path: storedPath,
+            fileName: `${fileName}.xlsx`,
+            url: getPublicUrl("files", storedPath),
+          },
+        });
       }
     } catch (error) {
       await session.abortTransaction();
