@@ -4,6 +4,7 @@ const {
   registerCompany,
   loginCompany,
   getAllCompany,
+  getAllCompanyEmployeeOptions,
   getCompanyAccounts,
   dahsboard,
   editCompany,
@@ -17,6 +18,7 @@ router.put("/:id", editCompany);
 router.delete("/:id", authenticationToken, deleteCompany);
 router.post("/login", loginCompany);
 router.get("/all", authenticationToken, getAllCompany);
+router.get("/options/employee", authenticationToken, getAllCompanyEmployeeOptions);
 router.get("/accounts", authenticationToken, getCompanyAccounts);
 router.get("/dashboard", authenticationToken, dahsboard);
 router.put("/:id/password", authenticationToken, resetCompanyPassword);

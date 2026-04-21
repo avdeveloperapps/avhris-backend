@@ -253,6 +253,19 @@ module.exports = {
       console.log(error);
     }
   },
+  getAllCompanyEmployeeOptions: async (req, res) => {
+    try {
+      const companies = await Company.find({}).select(
+        "_id company_name company_group company_longtitude company_latitude company_zone company_status company_header"
+      );
+      return res.status(200).json(companies);
+    } catch (error) {
+      console.log(error);
+      return res
+        .status(500)
+        .json({ message: "Failed to Get Company Options" });
+    }
+  },
   getCompanyAccounts: async (req, res) => {
     try {
       const { role } = req.admin;
