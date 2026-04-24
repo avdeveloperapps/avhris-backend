@@ -1,14 +1,14 @@
 const Task = require("./model");
+const Employee = require("../employee/model");
 
 module.exports = {
   getTask: async (req, res) => {
     try {
       const { company_id, departement_id, status, employee_id, created_date } =
         req.query;
-      const pageNumber = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
+      const pageNumber = Math.max(parseInt(req.query.page, 10) || 1, 1);
+      const limit = Math.max(parseInt(req.query.limit, 10) || 10, 1);
       const startIndex = (pageNumber - 1) * limit;
-      let findObj = {};
       let filterTask = {};
 
       if (company_id) {
@@ -27,14 +27,33 @@ module.exports = {
           },
         };
       }
-      if (departement_id) {
-        findObj = {
-          emp_depid: departement_id,
-        };
-      }
+      if (departement_id || employee_id) {
+        const employeeQuery = {};
+        if (departement_id) {
+          employeeQuery.emp_depid = departement_id;
+        }
+        if (employee_id) {
+          employeeQuery._id = employee_id;
+        }
 
-      if (employee_id) {
-        findObj = { ...findObj, _id: employee_id };
+        const employees = await Employee.find(employeeQuery)
+          .select("_id")
+          .lean()
+          .exec();
+        const employeeIds = employees.map((employee) => employee._id);
+
+        if (!employeeIds.length) {
+          return res.status(200).send({
+            data: [],
+            meta: {
+              total: 0,
+              totalPages: 0,
+              currentPage: pageNumber,
+            },
+          });
+        }
+
+        filterTask.task_workers = { $in: employeeIds };
       }
 
       if (status) {
@@ -48,7 +67,6 @@ module.exports = {
       const tasks = await Task.find(filterTask)
         .populate({
           path: "task_workers",
-          match: findObj,
           select: "_id emp_fullname emp_depid",
         })
         .populate({

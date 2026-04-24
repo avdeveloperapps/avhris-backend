@@ -111,10 +111,9 @@ module.exports = {
     try {
       const { compid, filter } = req.query;
 
-      const pageNumber = parseInt(req.query.page) || 0;
-      const limit = parseInt(req.query.limit) || 5;
-      let startIndex = (pageNumber - 1) * limit;
-      const endIndex = (pageNumber + 1) * limit;
+      const pageNumber = Math.max(parseInt(req.query.page, 10) || 1, 1);
+      const limit = Math.max(parseInt(req.query.limit, 10) || 5, 1);
+      const startIndex = (pageNumber - 1) * limit;
       let meta = {};
       let rawData = [];
       let query = {};
