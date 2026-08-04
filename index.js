@@ -45,6 +45,7 @@ const OutputFileRoutes = require("./output-file/routes");
 const UsersAndRolesRoutes = require("./users-and-roles/routes");
 const StatisticRoutes = require("./statistic/routes");
 const { getPublicUrl, isR2Configured } = require("./utils/r2");
+const { reportLanMonitor } = require("./utils/lanmonitor");
 // async function NotificationModel() {
 //   // const notif = await Task.find();
 //   // console.log(notif);
@@ -233,6 +234,24 @@ app.use(
   router.get("/", (req, res) => res.json({ message: "Welcome to Avapps API" }))
 );
 
+app.post(
+  `/${api_version}/telemetry/client-error`,
+  rateLimit({ windowMs: 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false }),
+  (req, res) => {
+    const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+    if (!message) return res.status(400).json({ message: "Payload telemetry tidak valid." });
+    reportLanMonitor({
+      level: "crash",
+      kind: typeof req.body?.kind === "string" ? req.body.kind.slice(0, 40) : "client_error",
+      message: message.slice(0, 16000),
+      stacktrace: typeof req.body?.stacktrace === "string" ? req.body.stacktrace.slice(0, 16000) : "",
+      requestPath: typeof req.body?.route === "string" ? req.body.route.slice(0, 512) : "",
+      context: { client_ip: req.ip, client: req.body?.context || {} },
+    });
+    return res.status(202).end();
+  }
+);
+
 app.use(`/${api_version}/admin`, adminRoute);
 app.use(`/${api_version}/company`, companyRoute);
 app.use(`/${api_version}/departement`, departementRoute);
@@ -270,6 +289,27 @@ app.use(`/${api_version}/payrun-process`, PayrunProcessRoutes);
 app.use(`/${api_version}/output-file`, OutputFileRoutes);
 app.use(`/${api_version}/users-and-roles`, UsersAndRolesRoutes);
 app.use(`/${api_version}/statistic`, StatisticRoutes);
+
+app.use((error, req, res, next) => {
+  reportLanMonitor({
+    level: "error",
+    kind: "unhandled_exception",
+    message: error?.message,
+    stacktrace: error?.stack,
+    requestPath: req.originalUrl,
+    context: { http_status: 500, method: req.method },
+  });
+  if (res.headersSent) return next(error);
+  return res.status(500).json({ message: "Internal server error" });
+});
+
+process.on("uncaughtException", (error) => {
+  reportLanMonitor({ level: "crash", kind: "backend_crash", message: error.message, stacktrace: error.stack });
+});
+
+process.on("unhandledRejection", (reason) => {
+  reportLanMonitor({ level: "error", kind: "unhandled_rejection", message: String(reason) });
+});
 
 // Ensure indexes are in sync on startup (covers existing data as well).
 const syncIndexesOnStart = async () => {
